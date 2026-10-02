@@ -12,10 +12,7 @@ from telebot.types import (
     WebAppInfo, BotCommand
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s: %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 log = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -33,13 +30,11 @@ app = Flask(__name__)
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS scores (
-            user_id INTEGER, username TEXT, chat_id INTEGER,
-            score INTEGER, level INTEGER DEFAULT 1,
-            updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, chat_id)
-        )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS scores (
+        user_id INTEGER, username TEXT, chat_id INTEGER,
+        score INTEGER, level INTEGER DEFAULT 1,
+        updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, chat_id))""")
     conn.commit(); conn.close()
 
 
@@ -92,7 +87,7 @@ def esc(s):
 # ================== معالجات ==================
 @bot.message_handler(commands=['start', 'play'])
 def cmd_start(message):
-    log.info(f"📩 /start from user={message.from_user.id} chat={message.chat.id} type={message.chat.type}")
+    log.info(f"📩 /start chat={message.chat.id} type={message.chat.type}")
     try:
         bot.send_message(message.chat.id, "🐦 <b>فوج النيبة — الطائر</b>", reply_markup=play_kb())
         log.info("✅ replied")
@@ -102,11 +97,9 @@ def cmd_start(message):
 
 @bot.message_handler(commands=['leaderboard'])
 def cmd_lb(message):
-    log.info(f"📩 /leaderboard from {message.chat.id}")
     rows = get_lb(message.chat.id, 10)
     if not rows:
-        bot.send_message(message.chat.id, "📭 لا توجد نتائج بعد.", reply_markup=play_kb())
-        return
+        bot.send_message(message.chat.id, "📭 لا توجد نتائج بعد.", reply_markup=play_kb()); return
     medals = ["🥇","🥈","🥉"]
     text = "🏆 <b>فوج النيبة — أفضل اللاعبين</b>\n\n"
     for i, (uid, name, sc, lvl) in enumerate(rows):
@@ -167,11 +160,11 @@ def api_score():
 
 @app.route('/')
 def home():
-    return "🐦 Bot is running with polling"
+    return "🐦 Bot is running"
 
 
-# ================== Polling في خلفية ==================
-def run_polling():
+# ================== Polling يبدأ فوراً عند تحميل الملف ==================
+def start_polling():
     log.info("🔁 Removing webhook...")
     try:
         bot.remove_webhook()
@@ -197,11 +190,10 @@ def run_polling():
             time.sleep(5)
 
 
-# ================== تشغيل ==================
+# ⚡ مهم: هذا السطر يشتغل لما gunicorn يحمّل الملف
+threading.Thread(target=start_polling, daemon=True).start()
+
+
 if __name__ == "__main__":
-    # ابدأ Polling في خلفية
-    t = threading.Thread(target=run_polling, daemon=True)
-    t.start()
-    # Flask للـ API فقط
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=port)
