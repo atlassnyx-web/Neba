@@ -69,7 +69,7 @@ builtins.input = _patched_input
 
 # ================== الإعدادات ==================
 BOT_TOKEN = "8982437459:AAHaPWogxBk-q42KC2XV9BQNeoNICkdCfSw"
-ADMIN_IDS = [7303935047, 8866376314, 7879875504, 7346087340]
+ADMIN_IDS = [7303935047, 8866376314, 7879875504, 7346087340, 5004091964]
 ADMIN_ID  = ADMIN_IDS[0]
 DB_PATH   = "shop.db"
 LOGS_DIR  = "logs"
