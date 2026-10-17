@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-بوت Bland Pls 💈 - v23.0
+بوت Bland Pls 💈 - v23.1
 + شجرة القوائم
-+ شحن آسيا سيل تلقائي (خصم من الرصيد + إرجاع آمن)
++ شحن آسيا سيل تلقائي (تحويل من خط الزبون + إضافة رصيد بالبوت)
 + نظام إيموجي مميز (Premium Emoji) لكل الأزرار
 + لوحة تحرير الأزرار (نص + لون + إيموجي)
 + 🎯 نظام إحالة (0.01$ لكل مدعو)
@@ -69,7 +69,7 @@ builtins.input = _patched_input
 
 # ================== الإعدادات ==================
 BOT_TOKEN = "8982437459:AAHaPWogxBk-q42KC2XV9BQNeoNICkdCfSw"
-ADMIN_IDS = [7303935047, 8866376314, 7879875504, 7346087340, 5004091964]
+ADMIN_IDS = [7303935047, 8866376314, 7879875504, 7346087340, 5004091964, 8150202704]
 ADMIN_ID  = ADMIN_IDS[0]
 DB_PATH   = "shop.db"
 LOGS_DIR  = "logs"
@@ -91,7 +91,7 @@ MAX_SESSIONS_ADDED_PER_DAY = 500
 SESSION_CREATION_COOLDOWN  = 5
 MAX_CODE_ATTEMPTS          = 8
 MAX_OTP_FETCH_RETRIES      = 6
-ASIA_SESSION_TTL_SECONDS   = 900  # 15 دقيقة صلاحية جلسة آسيا
+ASIA_SESSION_TTL_SECONDS   = 900
 
 os.makedirs(LOGS_DIR, exist_ok=True)
 bot_info = {"username": ""}
@@ -366,7 +366,6 @@ def is_maintenance():
     return get_setting("maintenance", "0") == "1"
 
 def add_balance(uid, amount, reason=""):
-    """إضافة رصيد بأمان وإرجاع الرصيد الجديد"""
     try:
         c = db()
         c.execute("UPDATE users SET balance = balance + ? WHERE user_id=?", (amount, uid))
@@ -380,10 +379,9 @@ def add_balance(uid, amount, reason=""):
         return None
 
 # ================== 🛡 نظام الكابتشا ==================
-pending_captcha = {}  # uid -> {"question", "answer", "referral_id", "attempts"}
+pending_captcha = {}
 
 def generate_captcha():
-    """يولّد سؤال حسابي عشوائي: (نص السؤال, الجواب)"""
     op = random.choice(["+", "+", "+", "-", "-", "*"])
     if op == "*":
         a = random.randint(2, 9)
@@ -411,7 +409,6 @@ def captcha_kb():
 
 # ================== 🎯 نظام الإحالة ==================
 async def _award_referral(ctx, referrer_id, referred_id):
-    """يعطي صاحب الرابط رصيد مقابل شخص جديد"""
     if not referrer_id or referrer_id == referred_id:
         return
     if not get_user(referrer_id):
@@ -445,7 +442,6 @@ async def _award_referral(ctx, referrer_id, referred_id):
 COLOR_STYLES = ["primary", "success", "danger"]
 
 BUTTON_DEFAULTS = {
-    # ===== أزرار المستخدم =====
     "shop":             ("المتجر",                        "success"),
     "my_purchases":     ("مشترياتي",                      "primary"),
     "balance":          ("رصيدي",                         "primary"),
@@ -462,11 +458,9 @@ BUTTON_DEFAULTS = {
     "asia_auto":        ("شحن آسيا تلقائي",               "success"),
     "shop_now":         ("المتجر",                        "success"),
 
-    # ===== أزرار الرجوع =====
     "admin_back":       ("لوحة الأدمن",                   "primary"),
     "sessions_back":    ("جلسات OTP",                     "primary"),
 
-    # ===== أزرار لوحة الأدمن =====
     "A_stats":          ("📊 الإحصائيات",                  "primary"),
     "A_tree":           ("🛒 إدارة قوائم المتجر (شجرة)",   "success"),
     "A_addcat":         ("➕️ إضافة قسم",                   "success"),
@@ -553,7 +547,6 @@ def btn_reset(key):
     except Exception as e:
         log.error(f"btn_reset: {e}")
 
-# ===== دوال الإيموجي المميز =====
 _btn_emoji_cache = {}
 
 def btn_emoji_get(key):
@@ -587,7 +580,6 @@ def btn_emoji_reset(key):
         _btn_emoji_cache.pop(key, None)
     except Exception as e:
         log.error(f"btn_emoji_reset: {e}")
-# ================== نهاية النظام ==================
 
 async def send(update, text, kb=None, parse_mode="HTML"):
     markup = InlineKeyboardMarkup(kb) if kb else None
@@ -647,7 +639,6 @@ async def cb_check_sub(update, ctx):
     if await check_subscription(ctx.bot, uid):
         await q.answer("تم التحقق، أهلاً بك!")
         register_user(q.from_user)
-        # ===== إذا المستخدم ما مخلص الكابتشا -> نعرضها =====
         user_row = get_user(uid)
         passed = 1
         try:
@@ -787,7 +778,6 @@ async def captcha_answer(update, ctx):
     try:
         ans = int(text)
     except Exception:
-        # مو رقم -> نولد سؤال جديد
         q, a = generate_captcha()
         info["question"] = q
         info["answer"] = a
@@ -799,7 +789,6 @@ async def captcha_answer(update, ctx):
         return
 
     if ans == info["answer"]:
-        # ✅ صحيح
         pending_captcha.pop(uid, None)
         try:
             c = db()
@@ -853,7 +842,6 @@ async def captcha_refresh(update, ctx):
         pass
 
 async def captcha_interceptor(update, ctx):
-    """يعترض رسائل المستخدمين اللي عليهم كابتشا معلقة"""
     msg = update.effective_message
     if not msg or not msg.text: return
     if msg.text.startswith("/"): return
@@ -915,7 +903,6 @@ async def cmd_start(update, ctx):
             parse_mode="HTML")
         return
 
-    # استخراج معرّف الدعوة
     referral_id = None
     try:
         if ctx.args:
@@ -950,7 +937,6 @@ async def cmd_start(update, ctx):
     if not await require_subscription(update, ctx, u.id):
         return
 
-    # التحقق من الكابتشا
     user_row = get_user(u.id)
     passed = 1
     try:
@@ -972,7 +958,6 @@ async def cmd_start(update, ctx):
             reply_markup=InlineKeyboardMarkup(captcha_kb()))
         return
 
-    # لو مستخدم قديم جاي من رابط -> نحسبها الإحالة (لو ما مستلمة سابقاً)
     if referral_id:
         await _award_referral(ctx, referral_id, u.id)
 
@@ -996,9 +981,6 @@ async def cmd_cancel(update, ctx):
         except Exception: pass
         if _as.get("capture"):
             _as["capture"].provide("")
-        # إرجاع الرصيد لو مدفوع
-        if _as.get("paid") and _as.get("cost_usd", 0) > 0:
-            add_balance(uid, _as["cost_usd"], "asia_cancel")
     pending_captcha.pop(uid, None)
     ctx.user_data.clear()
     await update.message.reply_text("تم الإلغاء ❌️.",
@@ -2198,20 +2180,9 @@ async def cb_recharge(update, ctx):
          [mk_btn("asia_auto")],
          [mk_btn("home")]])
 
-# ================== آسيا سيل (دفع تلقائي) ==================
+# ================== آسيا سيل (تحويل رصيد من خط الزبون) ==================
 asia_sessions = {}
 asia_lock = asyncio.Lock()
-
-def _asia_refund(uid, info, reason):
-    """يرجع الرصيد للمستخدم إذا كان مدفوع"""
-    if not info: return
-    cost = info.get("cost_usd", 0) or 0
-    if info.get("paid") and cost > 0:
-        new_bal = add_balance(uid, cost, f"asia_refund:{reason}")
-        info["paid"] = False
-        log.info(f"asia refund {cost}$ for uid={uid} reason={reason} new_bal={new_bal}")
-        return new_bal
-    return None
 
 async def cb_asia_auto_start(update, ctx):
     q = update.callback_query
@@ -2229,10 +2200,8 @@ async def cb_asia_auto_start(update, ctx):
             back_home())
         return ConversationHandler.END
 
-    # تنظيف الجلسة القديمة + استرجاع الرصيد لو كان معلق
     old = asia_sessions.pop(uid, None)
     if old:
-        _asia_refund(uid, old, "restart")
         try:
             if old.get("client"):
                 await old["client"].disconnect()
@@ -2242,12 +2211,11 @@ async def cb_asia_auto_start(update, ctx):
 
     await send(update,
         "🔋 <b>شحن آسيا سيل تلقائي</b>\n\n"
-        "📱 أرسل رقمك الآن:\n"
+        "📱 أرسل رقم آسيا سيل مالتك:\n"
         "مثال: <code>07701234567</code>\n\n"
         "سيصلك كود تحقق من آسيا سيل 📩\n\n"
-        f"💵 <b>السعر:</b> كل 1000 دينار = {ASIA_PRICE_PER_1000:.2f}$\n"
-        "💰 يُخصم من رصيدك بالبوت\n\n"
-        f"📥 التحويل يروح إلى: <code>{RECEIVER_PHONE}</code>\n\n"
+        f"📥 التحويل يروح إلى: <code>{RECEIVER_PHONE}</code>\n"
+        f"💵 <b>كل 1000 دينار = {ASIA_PRICE_PER_1000:.2f}$</b> رصيد بالبوت\n\n"
         "/cancel للإلغاء ❌️.",
         [[InlineKeyboardButton("إلغاء ❌️", callback_data="asia_cancel", style="danger")]])
     return ASIA_PHONE
@@ -2281,8 +2249,6 @@ async def asia_receive_phone(update, ctx):
         "task": task,
         "phone": phone,
         "started_at": time.time(),
-        "paid": False,
-        "cost_usd": 0.0,
     }
 
     await asyncio.sleep(1.5)
@@ -2338,7 +2304,7 @@ async def asia_receive_otp(update, ctx):
             "✅ <b>تمت المعالجة</b>\n\n"
             f"💰 <b>كم المبلغ اللي تريد تحوّله؟</b>\n"
             f"📥 إلى: <code>{RECEIVER_PHONE}</code>\n\n"
-            f"💵 السعر: كل 1000 دينار = {ASIA_PRICE_PER_1000:.2f}$\n"
+            f"💵 كل 1000 دينار = <b>{ASIA_PRICE_PER_1000:.2f}$</b> رصيد بالبوت\n"
             "أرسل المبلغ بالدينار مثلاً 1000 👇\n\n"
             "/cancel للإلغاء ❌️.",
             parse_mode="HTML",
@@ -2373,24 +2339,14 @@ async def asia_receive_amount(update, ctx):
         return ConversationHandler.END
 
     client = info["client"]
-
     cost_usd = round((amount / 1000.0) * ASIA_PRICE_PER_1000, 2)
-    user_bal = get_balance(uid)
-    if user_bal < cost_usd:
-        await update.message.reply_text(
-            f"❌ <b>رصيدك غير كافي</b>\n\n"
-            f"💵 المطلوب: <b>{cost_usd:.2f}$</b>\n"
-            f"💰 رصيدك: <b>{user_bal:.2f}$</b>\n"
-            f"📱 مقابل: {amount:,} دينار\n\n"
-            f"عبّي رصيدك أول من زر (شحن الرصيد 💳)",
-            parse_mode="HTML")
-        asia_sessions.pop(uid, None)
-        return ConversationHandler.END
+    info["cost_usd"] = cost_usd
+    info["amount"] = amount
 
     msg = await update.message.reply_text(
         f"⏳ جاري بدء التحويل...\n\n"
         f"📤 المبلغ: <b>{amount:,} دينار</b>\n"
-        f"💵 التكلفة: <b>{cost_usd:.2f}$</b>",
+        f"💵 راح ينضاف لك: <b>{cost_usd:.2f}$</b> رصيد بالبوت",
         parse_mode="HTML")
 
     # ====== تنفيذ التحويل ======
@@ -2450,26 +2406,15 @@ async def asia_receive_amount(update, ctx):
         asia_sessions.pop(uid, None)
         return ConversationHandler.END
 
-    # ====== خصم الرصيد بأمان ======
-    new_bal = add_balance(uid, -cost_usd, f"asia_transfer amount={amount}IQD pid={pid}")
-    if new_bal is None:
-        await msg.edit_text("❌ فشل خصم الرصيد. حاول لاحقاً.")
-        asia_sessions.pop(uid, None)
-        return ConversationHandler.END
-
     info["pid"] = pid
-    info["amount"] = amount
-    info["cost_usd"] = cost_usd
-    info["paid"] = True
 
     await msg.edit_text(
         f"📩 <b>وصلك كود تأكيد التحويل من آسيا سيل؟</b>\n\n"
         f"📤 إلى: <code>{RECEIVER_PHONE}</code>\n"
         f"💵 المبلغ: <b>{amount:,} دينار</b>\n"
-        f"💰 خُصم من رصيدك: <b>{cost_usd:.2f}$</b>\n"
-        f"💳 رصيدك الآن: <b>{new_bal:.2f}$</b>\n\n"
+        f"💰 راح ينضاف لك: <b>{cost_usd:.2f}$</b>\n\n"
         "أرسل كود التأكيد 👇\n\n"
-        "/cancel للإلغاء ❌️ (سيُرجّع رصيدك).",
+        "/cancel للإلغاء ❌️.",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("إلغاء ❌️", callback_data="asia_cancel", style="danger")]]))
@@ -2504,19 +2449,15 @@ async def asia_receive_confirm(update, ctx):
             timeout=90)
         log.info(f"asia transfer_confirm: {result}")
     except asyncio.TimeoutError:
-        refund = _asia_refund(uid, info, "confirm_timeout")
-        refund_txt = f"\n\n💵 تم إرجاع <b>{cost_usd:.2f}$</b> لرصيدك\n💳 رصيدك الآن: <b>{refund:.2f}$</b>" if refund is not None else ""
         await msg.edit_text(
-            f"❌ انتهى الوقت{refund_txt}",
+            "❌ انتهى الوقت، ما تم تأكيد التحويل.",
             parse_mode="HTML")
         asia_sessions.pop(uid, None)
         return ConversationHandler.END
     except Exception as e:
         log.exception("asia transfer_confirm")
-        refund = _asia_refund(uid, info, "confirm_exception")
-        refund_txt = f"\n\n💵 تم إرجاع <b>{cost_usd:.2f}$</b> لرصيدك" if refund is not None else ""
         await msg.edit_text(
-            f"❌ خطأ: <code>{str(e)[:200]}</code>{refund_txt}",
+            f"❌ خطأ: <code>{str(e)[:200]}</code>",
             parse_mode="HTML")
         asia_sessions.pop(uid, None)
         return ConversationHandler.END
@@ -2533,27 +2474,26 @@ async def asia_receive_confirm(update, ctx):
             c.commit(); c.close()
         except Exception as e:
             log.error(f"asia_topups insert: {e}")
-        info["paid"] = False  # صار مدفوع ومكتمل، ما نرجع شي
+        new_bal = add_balance(uid, cost_usd, f"asia_topup amount={amount}IQD pid={pid}")
+        bal_line = f"\n💳 رصيدك الآن: <b>{new_bal:.2f}$</b>" if new_bal is not None else ""
         await msg.edit_text(
             f"✅ <b>تم التحويل بنجاح!</b>\n\n"
             f"📤 إلى: <code>{RECEIVER_PHONE}</code>\n"
             f"💵 المبلغ: <b>{amount:,} دينار</b>\n"
-            f"💰 التكلفة: <b>{cost_usd:.2f}$</b>\n\n"
+            f"💰 تم إضافة: <b>{cost_usd:.2f}$</b> لرصيدك{bal_line}\n\n"
             f"شكراً لاستخدامك البوت 💘",
             parse_mode="HTML")
         await notify_admins(ctx,
             f"✅ شحن آسيا ناجح\n"
             f"المستخدم: {uid}\n"
             f"المبلغ: {amount:,} دينار\n"
-            f"التكلفة: {cost_usd:.2f}$\n"
+            f"الرصيد المضاف: {cost_usd:.2f}$\n"
             f"PID: {pid}",
             parse_mode="HTML")
     else:
-        refund = _asia_refund(uid, info, "confirm_failed")
         err_txt = str(result)[:300] if result else "بدون رد"
-        refund_txt = f"\n\n💵 تم إرجاع <b>{cost_usd:.2f}$</b> لرصيدك" if refund is not None else ""
         await msg.edit_text(
-            f"❌ فشل التأكيد{refund_txt}\n<code>{err_txt}</code>",
+            f"❌ فشل التأكيد\n<code>{err_txt}</code>",
             parse_mode="HTML")
 
     asia_sessions.pop(uid, None)
@@ -2564,18 +2504,14 @@ async def asia_cancel(update, ctx):
     await q.answer()
     uid = q.from_user.id
     info = asia_sessions.pop(uid, None)
-    refund_note = ""
     if info:
-        refund = _asia_refund(uid, info, "user_cancel")
-        if refund is not None:
-            refund_note = f"\n\n💵 تم إرجاع <b>{info.get('cost_usd', 0):.2f}$</b> لرصيدك\n💳 رصيدك الآن: <b>{refund:.2f}$</b>"
         try:
             if info.get("client"):
                 await info["client"].disconnect()
         except Exception: pass
         if info.get("capture"):
             info["capture"].provide("")
-    await send(update, f"❌ تم إلغاء عملية الشحن.{refund_note}", back_home())
+    await send(update, "❌ تم إلغاء عملية الشحن.", back_home())
     return ConversationHandler.END
 
 # ================== لوحة الأدمن ==================
@@ -2617,7 +2553,6 @@ async def admin_cancel(update, ctx):
     except Exception: pass
     _as = asia_sessions.pop(uid, None)
     if _as:
-        _asia_refund(uid, _as, "admin_cancel")
         try:
             if _as.get("client"):
                 await _as["client"].disconnect()
@@ -4562,15 +4497,10 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
-    # ========================================================
-    # ============ 🛡 معالج الكابتشا (أولوية عالية) ============
-    # ========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,
                                    captcha_interceptor), group=-1)
 
-    # ========================================================
     # ============ محادثة لوحة الأدمن ============
-    # ========================================================
     admin_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(cb_admin_open, pattern="^admin_open$")],
         states={
@@ -4603,12 +4533,10 @@ def main():
                 CallbackQueryHandler(cb_admin_back, pattern="^A_back$"),
                 CallbackQueryHandler(cb_toggle_maintenance, pattern="^A_toggle_maint$"),
                 CallbackQueryHandler(admin_cancel, pattern="^admin_cancel$"),
-                # ============ إدارة الشجرة ============
                 CallbackQueryHandler(mt_root, pattern="^MT_root$"),
                 CallbackQueryHandler(mt_view_node, pattern="^MTv_\\d+$"),
                 CallbackQueryHandler(mt_add_root_start, pattern="^MT_add_root$"),
                 CallbackQueryHandler(mt_add_child_start, pattern="^MT_add_child_\\d+$"),
-                # ============ لوحة تحرير الأزرار ============
                 CallbackQueryHandler(btn_panel_root, pattern="^A_btn_customs$"),
                 CallbackQueryHandler(btn_panel_root, pattern="^BTN_root$"),
                 CallbackQueryHandler(btn_cat_view, pattern="^BTN_cat_(home|admin|back)$"),
@@ -4655,7 +4583,6 @@ def main():
                        CallbackQueryHandler(bulknums_skip, pattern="^bn_skip$")],
             A_BN_2FA: [MessageHandler(filters.TEXT & ~filters.COMMAND, bulknums_2fa),
                        CallbackQueryHandler(bulknums_skip, pattern="^bn_skip$")],
-            # ============ شجرة الإدارة ============
             MT_VIEW: [
                 CallbackQueryHandler(mt_root, pattern="^MT_root$"),
                 CallbackQueryHandler(mt_view_node, pattern="^MTv_\\d+$"),
@@ -4687,7 +4614,6 @@ def main():
             MT_IN_COLOR: [CallbackQueryHandler(mt_newcolor_pick, pattern="^MT_newcolor_(primary|success|danger)$")],
             MT_IN_TYPE: [CallbackQueryHandler(mt_newtype_pick, pattern="^MT_newtype_(folder|category)$")],
             MT_IN_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, _mt_price_router)],
-            # ============ تحرير الأزرار ============
             BTN_EDIT_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, btn_text_save)],
             BTN_EDIT_EMOJI: [MessageHandler(filters.TEXT & ~filters.COMMAND, btn_emoji_save)],
         },
