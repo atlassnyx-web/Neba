@@ -75,7 +75,7 @@ DB_PATH   = "shop.db"
 LOGS_DIR  = "logs"
 BOT_NAME  = "Bland Pls"
 
-RECEIVER_PHONE      = "07782591120"
+RECEIVER_PHONE      = "07735277696"
 ASIA_PRICE_PER_1000 = 0.60
 
 CHANNEL_URL  = "https://t.me/sdsdew_4"
